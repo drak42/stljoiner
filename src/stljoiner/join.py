@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""stljoin - reassemble split STL parts by matching their mating faces.
+"""stljoiner - reassemble split STL parts by matching their mating faces.
 
 Given several STL files that were cut from one part (e.g. split to fit a
 print bed), stljoin finds the planar faces that mate with each other,
@@ -24,7 +23,7 @@ from shapely import affinity
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
-__version__ = "0.1.0"
+from stljoiner.version import __version__
 
 # --------------------------------------------------------------------------
 # Data structures
@@ -441,7 +440,9 @@ def combine(meshes: list[trimesh.Trimesh], union: bool) -> trimesh.Trimesh:
 # --------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(prog="stljoiner", description=__doc__,
+                                 epilog="Run 'stljoiner web' for the browser interface.",
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inputs", nargs="+", type=Path, help="STL files to join (2 or more)")
     ap.add_argument("--version", action="version", version=f"stljoiner {__version__}")
     ap.add_argument("-o", "--output", type=Path, default=Path("joined.stl"), help="output STL (default: joined.stl)")

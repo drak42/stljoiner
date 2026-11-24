@@ -10,19 +10,18 @@ This guide covers the web interface first, since it's the easiest way to use stl
 
 ## Setting up (one time)
 
-You need Python 3.10 or newer and [uv](https://docs.astral.sh/uv/).
+You need Python 3.10 or newer. Install stljoiner with [pipx](https://pipx.pypa.io/), which keeps it in its own tidy environment:
 
 ```bash
-git clone https://github.com/drak42/stljoiner.git
-cd stljoiner
-uv venv
-uv pip install -r requirements.txt
+pipx install stljoiner
 ```
+
+No pipx? `pip install stljoiner` works too. To update later: `pipx upgrade stljoiner`.
 
 ## Starting the app
 
 ```bash
-.venv/bin/python app.py
+stljoiner web
 ```
 
 Then open **http://127.0.0.1:4300** in your browser.
@@ -136,7 +135,7 @@ This usually means one of the pieces had holes in its mesh (look for ⚠ in the 
 Check your internet connection (the viewer loads from a CDN), then reload the page.
 
 **Port 4300 is already in use.**
-Start the app on another port, for example `.venv/bin/python app.py --port 4301`.
+Start the app on another port, for example `stljoiner web --port 4301`.
 
 ---
 
@@ -145,7 +144,7 @@ Start the app on another port, for example `.venv/bin/python app.py --port 4301`
 To join files without the browser:
 
 ```bash
-.venv/bin/python stljoin.py part1.stl part2.stl part3.stl -o joined.stl
+stljoiner part1.stl part2.stl part3.stl -o joined.stl
 ```
 
 This works like Auto-join, with the same strengths and limits. Useful options:

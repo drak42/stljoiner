@@ -6,6 +6,25 @@ All notable changes to stljoiner are recorded here. The format follows
 
 ## [Unreleased]
 
+Install from PyPI.
+
+### Added
+
+- stljoiner is a Python package: `pipx install stljoiner` (or `pip install
+  stljoiner`) installs the `stljoiner` command on Linux, macOS and Windows.
+- `stljoiner web` starts the web interface (`--port`, `--host`).
+- `python -m stljoiner` works the same as `stljoiner`.
+- Release workflow: pushing a version tag creates the GitHub release and
+  uploads the package to PyPI.
+- CI also runs on Windows and macOS and checks that the package builds.
+
+### Changed
+
+- `stljoiner PART.stl ...` replaces `python stljoin.py PART.stl ...`, and
+  `stljoiner web` replaces `python app.py`. The code now lives in
+  `src/stljoiner/`.
+- Dependencies are listed in `pyproject.toml`. `requirements.txt` is gone.
+
 ## [0.1.0] - 2026-11-25
 
 First release.

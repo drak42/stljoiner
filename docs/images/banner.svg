@@ -693,7 +693,7 @@
 <rect x="58" y="138" width="664" height="424" rx="34" fill="#0a0f0b" stroke="#1f3a28" stroke-width="3"/>
 <rect x="70" y="150" width="640" height="400" rx="26" fill="url(#screen)"/>
 <g clip-path="url(#crt)" filter="url(#glow)" font-size="18">
-<text x="98" y="196" fill="#b6ffcc" xml:space="preserve">$ stljoin.py bracket_*.stl -o bracket.stl</text>
+<text x="98" y="196" fill="#b6ffcc" xml:space="preserve">$ stljoiner bracket_*.stl -o bracket.stl</text>
 <text x="98" y="248" fill="#39ff7a" xml:space="preserve">Finding mating faces among 3 parts...</text>
 <text x="98" y="274" fill="#39ff7a" xml:space="preserve">  bracket_a.stl: 6 candidate faces</text>
 <text x="98" y="300" fill="#39ff7a" xml:space="preserve">  bracket_b.stl: 6 candidate faces</text>

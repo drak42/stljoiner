@@ -4,8 +4,8 @@ import io
 import pytest
 import trimesh
 
-import app as webapp
-import stljoin
+from stljoiner import join as stljoin
+from stljoiner import web as webapp
 
 
 @pytest.fixture

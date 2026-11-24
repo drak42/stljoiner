@@ -1,12 +1,32 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "stljoiner"
-version = "0.1.0"
-description = "Reassemble split STL parts by matching their mating faces, with a browser interface."
+dynamic = ["version"]
+description = "Put split STL parts back together by matching their cut faces, and save them as one watertight solid. Web interface and command line."
 readme = "README.md"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Christopher Eslick" }]
-requires-python = ">=3.10"
+keywords = ["3d-printing", "stl", "mesh", "join", "merge", "split", "assembly", "trimesh"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Manufacturing",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Topic :: Printing",
+]
 dependencies = [
     "trimesh>=4",
     "numpy",
@@ -19,12 +39,31 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+dev = ["pytest>=8", "ruff", "build", "twine"]
+media = ["pillow"]
+
+[project.scripts]
+stljoiner = "stljoiner.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/drak42/stljoiner"
+Repository = "https://github.com/drak42/stljoiner"
 Issues = "https://github.com/drak42/stljoiner/issues"
+Changelog = "https://github.com/drak42/stljoiner/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/drak42/stljoiner/blob/main/docs/USER_GUIDE.md"
 Funding = "https://buymeacoffee.com/drak42"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stljoiner = ["static/*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "stljoiner.version.__version__" }
 
 [tool.ruff]
 line-length = 120
@@ -34,8 +73,8 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "B", "UP", "BLE", "RUF", "EXE"]
 allowed-confusables = ["×"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["stljoiner", "conftest", "make_test_parts"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["stljoin", "app", "conftest", "make_test_parts"]

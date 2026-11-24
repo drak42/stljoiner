@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
-"""Web interface for stljoin: load STL parts, pick the faces to join, export.
+"""Web interface for stljoiner: load STL parts, pick the faces to join, export.
 
-Run:  .venv/bin/python app.py   then open http://127.0.0.1:4300
+Run:  stljoiner web   then open http://127.0.0.1:4300
 """
 from __future__ import annotations
 
@@ -16,7 +15,8 @@ import numpy as np
 import trimesh
 from flask import Flask, jsonify, request, send_file, send_from_directory
 
-import stljoin
+from stljoiner import join as stljoin
+from stljoiner.version import __version__
 
 STATIC = Path(__file__).parent / "static"
 PALETTE = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759", "#b07aa1",
@@ -315,15 +315,21 @@ def export():
     return send_file(io.BytesIO(data), mimetype="model/stl", as_attachment=True, download_name=name)
 
 
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
+def main(argv: list[str] | None = None) -> int:
+    global ALLOWED_HOSTS
+    ap = argparse.ArgumentParser(prog="stljoiner web", description="Start the stljoiner web interface.")
     ap.add_argument("--host", default="127.0.0.1",
                     help="address to listen on (default 127.0.0.1: this computer only)")
-    ap.add_argument("--port", type=int, default=4300)
-    ap.add_argument("--version", action="version", version=f"stljoiner {stljoin.__version__}")
-    args = ap.parse_args()
+    ap.add_argument("--port", type=int, default=4300, help="port to listen on (default 4300)")
+    ap.add_argument("--version", action="version", version=f"stljoiner {__version__}")
+    args = ap.parse_args(argv)
     if args.host not in ("127.0.0.1", "localhost"):
         ALLOWED_HOSTS = None
-        print("warning: the web UI has no login; anyone who can reach this address can use it")
-    print(f"stljoin web UI: http://{args.host}:{args.port}")
+        print("warning: the web interface has no login; anyone who can reach this address can use it")
+    print(f"stljoiner web interface: http://{args.host}:{args.port}  (Ctrl+C to stop)")
     app.run(host=args.host, port=args.port, threaded=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

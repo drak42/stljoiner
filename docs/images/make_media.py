@@ -10,6 +10,7 @@ Makes, in this folder:
 The geometry is the real test part from tests/make_test_parts.py. Rendering
 the SVGs to PNG uses headless Google Chrome; building the GIF needs Pillow.
 
+    pip install -e '.[media]'
     .venv/bin/python docs/images/make_media.py
 """
 from __future__ import annotations
@@ -231,7 +232,7 @@ def banner() -> str:
                'stroke-width="3"/>')
     out.append('<rect x="70" y="150" width="640" height="400" rx="26" fill="url(#screen)"/>')
     lines = [
-        ("$ stljoin.py bracket_*.stl -o bracket.stl", "#b6ffcc"),
+        ("$ stljoiner bracket_*.stl -o bracket.stl", "#b6ffcc"),
         ("", None),
         ("Finding mating faces among 3 parts...", GREEN),
         ("  bracket_a.stl: 6 candidate faces", GREEN),

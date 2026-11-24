@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT), str(ROOT / "tests")]
+sys.path.insert(0, str(ROOT / "tests"))
 
 from make_test_parts import make_parts  # noqa: E402
 

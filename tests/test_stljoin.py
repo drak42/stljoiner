@@ -6,8 +6,9 @@ import numpy as np
 import pytest
 import trimesh
 
-import stljoin
-from conftest import ROOT
+import stljoiner
+from stljoiner import join as stljoin
+from stljoiner.cli import main as cli_main
 
 
 def load(path):
@@ -91,5 +92,15 @@ def test_alignment_is_exact():
 
 
 def test_cli_version():
-    out = subprocess.run([sys.executable, str(ROOT / "stljoin.py"), "--version"], capture_output=True, text=True)
-    assert out.stdout.strip() == f"stljoiner {stljoin.__version__}"
+    out = subprocess.run([sys.executable, "-m", "stljoiner", "--version"], capture_output=True, text=True)
+    assert out.stdout.strip() == f"stljoiner {stljoiner.__version__}"
+
+
+def test_cli_dispatches_web(monkeypatch):
+    from stljoiner import web
+
+    seen = {}
+    monkeypatch.setattr(web.app, "run", lambda **kw: seen.update(kw))
+    assert cli_main(["web", "--port", "4399"]) == 0
+    assert seen["port"] == 4399
+    assert seen["host"] == "127.0.0.1"

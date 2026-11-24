@@ -26,19 +26,18 @@ Did you cut a model to fit your print bed, or download one that came in pieces? 
 
 ## Install
 
-You need Python 3.10 or newer and [uv](https://docs.astral.sh/uv/).
+You need Python 3.10 or newer. The easiest way is [pipx](https://pipx.pypa.io/), which gives stljoiner its own environment:
 
 ```bash
-git clone https://github.com/drak42/stljoiner.git
-cd stljoiner
-uv venv
-uv pip install -r requirements.txt
+pipx install stljoiner
 ```
+
+`pip install stljoiner` works too, as does `uv tool install stljoiner`. Upgrade later with `pipx upgrade stljoiner`.
 
 ## Web interface
 
 ```bash
-.venv/bin/python app.py          # then open http://127.0.0.1:4300
+stljoiner web          # then open http://127.0.0.1:4300
 ```
 
 ![The web interface: a parts list with two pieces joined, the face-picking panel, and the parts in a 3D view](docs/images/web-ui.png)
@@ -48,12 +47,12 @@ uv pip install -r requirements.txt
 3. If it's turned the wrong way, press **Next rotation**.
 4. Repeat until everything is joined, then **Export STL**.
 
-Use `--port` to choose another port. The page is served on this computer only (`127.0.0.1`).
+Use `stljoiner web --port 4301` to choose another port. The page is served on this computer only (`127.0.0.1`).
 
 ## Command line
 
 ```bash
-.venv/bin/python stljoin.py part1.stl part2.stl part3.stl -o joined.stl
+stljoiner part1.stl part2.stl part3.stl -o joined.stl
 ```
 
 | Option | Meaning |

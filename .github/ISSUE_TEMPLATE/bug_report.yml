@@ -27,8 +27,8 @@ body:
     id: version
     attributes:
       label: stljoiner version
-      description: Output of `.venv/bin/python stljoin.py --version`
-      placeholder: stljoiner 0.1.0
+      description: Output of `stljoiner --version`
+      placeholder: stljoiner 0.2.0
     validations:
       required: true
   - type: input
