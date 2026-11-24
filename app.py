@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Web interface for stljoin: load STL parts, pick the faces to join, export.
 
-Run:  .venv/bin/python app.py   then open http://127.0.0.1:5000
+Run:  .venv/bin/python app.py   then open http://127.0.0.1:4300
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class Part:
     def info(self) -> dict:
         m = self.mesh
         return {"id": self.id, "name": self.name, "color": self.color, "group": self.group,
-                "version": self.version, "triangles": int(len(m.faces)),
+                "version": self.version, "triangles": len(m.faces),
                 "watertight": bool(m.is_watertight)}
 
 
@@ -88,6 +88,16 @@ class Session:
 
 
 S = Session()
+# Host names the server answers to; None means any (set when --host opens it to the network).
+ALLOWED_HOSTS: set[str] | None = {"localhost", "127.0.0.1"}
+
+
+@app.before_request
+def check_host():
+    """Refuse requests for other host names (guards against DNS rebinding)."""
+    if ALLOWED_HOSTS is not None and request.host.rsplit(":", 1)[0] not in ALLOWED_HOSTS:
+        return error("unknown host", 403)
+    return None
 
 
 def error(msg: str, code: int = 400):
@@ -125,7 +135,7 @@ def upload():
             try:
                 m = trimesh.load(io.BytesIO(f.read()), file_type="stl", force="mesh")
                 m.merge_vertices()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - report any unreadable file back to the page
                 errors.append(f"{f.filename}: {exc}")
                 continue
             pid = next(S.ids)
@@ -198,6 +208,8 @@ def join():
         fits = stljoin.rotation_fits(fa, fb)
         if not fits:
             return error("faces don't overlap in any rotation")
+        # Offer only the rotations that fit about as well as the best one.
+        fits = [f for f in fits if f[1] >= fits[0][1] - 0.03]
         S.snapshot()
         moving = S.group_members(b.group)
         S.pending = {"fits": fits,
@@ -305,8 +317,13 @@ def export():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=5000)
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="address to listen on (default 127.0.0.1: this computer only)")
+    ap.add_argument("--port", type=int, default=4300)
+    ap.add_argument("--version", action="version", version=f"stljoiner {stljoin.__version__}")
     args = ap.parse_args()
+    if args.host not in ("127.0.0.1", "localhost"):
+        ALLOWED_HOSTS = None
+        print("warning: the web UI has no login; anyone who can reach this address can use it")
     print(f"stljoin web UI: http://{args.host}:{args.port}")
     app.run(host=args.host, port=args.port, threaded=True)

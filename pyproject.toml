@@ -1,0 +1,41 @@
+[project]
+name = "stljoiner"
+version = "0.1.0"
+description = "Reassemble split STL parts by matching their mating faces, with a browser interface."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Christopher Eslick" }]
+requires-python = ">=3.10"
+dependencies = [
+    "trimesh>=4",
+    "numpy",
+    "scipy",
+    "shapely>=2",
+    "manifold3d",
+    "networkx",
+    "rtree",
+    "flask>=3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/drak42/stljoiner"
+Issues = "https://github.com/drak42/stljoiner/issues"
+Funding = "https://buymeacoffee.com/drak42"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE", "RUF", "EXE"]
+allowed-confusables = ["×"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["stljoin", "app", "conftest", "make_test_parts"]

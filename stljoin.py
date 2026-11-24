@@ -24,6 +24,7 @@ from shapely import affinity
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
+__version__ = "0.1.0"
 
 # --------------------------------------------------------------------------
 # Data structures
@@ -170,7 +171,7 @@ def coplanar_groups(mesh: trimesh.Trimesh) -> list[np.ndarray]:
             continue
         n /= norm
         d = float(np.dot(n, mesh.triangles_center[g[0]]))
-        key = tuple(np.round(n, 3)) + (round(d / (1e-4 * scale)),)
+        key = (*np.round(n, 3).tolist(), round(d / (1e-4 * scale)))
         buckets.setdefault(key, []).append(g)
     groups = [np.concatenate(gs) for gs in buckets.values()]
     mesh._cache.cache["coplanar_groups"] = groups
@@ -308,7 +309,8 @@ def match_faces(fa: Face, fb: Face, mesh_b: trimesh.Trimesh, tol: float, coarse_
     T = placement(fa, fb, best_theta, dtheta, offset)
 
     # B's body must end up on the far side of the face, not inside A.
-    side = np.dot(trimesh.transform_points([mesh_b.center_mass if mesh_b.is_volume else mesh_b.centroid], T)[0] - fa.centroid, fa.normal)
+    center_b = mesh_b.center_mass if mesh_b.is_volume else mesh_b.centroid
+    side = np.dot(trimesh.transform_points([center_b], T)[0] - fa.centroid, fa.normal)
     if side <= 0:
         return None
 
@@ -428,7 +430,7 @@ def combine(meshes: list[trimesh.Trimesh], union: bool) -> trimesh.Trimesh:
         meshes = snap_seams(meshes)
         try:
             return trimesh.boolean.union(meshes, engine="manifold")
-        except Exception as exc:  # non-watertight input, etc.
+        except Exception as exc:  # noqa: BLE001 - any union failure falls back to concatenation
             print(f"warning: boolean union failed ({exc}); writing parts concatenated instead",
                   file=sys.stderr)
     return trimesh.util.concatenate(meshes)
@@ -441,6 +443,7 @@ def combine(meshes: list[trimesh.Trimesh], union: bool) -> trimesh.Trimesh:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inputs", nargs="+", type=Path, help="STL files to join (2 or more)")
+    ap.add_argument("--version", action="version", version=f"stljoiner {__version__}")
     ap.add_argument("-o", "--output", type=Path, default=Path("joined.stl"), help="output STL (default: joined.stl)")
     ap.add_argument("--no-union", action="store_true",
                     help="just place the parts and concatenate them (no boolean union)")
@@ -481,10 +484,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  joined {names[m.b.part]} → {names[m.a.part]}: face area {m.a.area:.1f} mm², "
                   f"fit {m.iou * 100:.1f}%{note}", file=sys.stderr)
 
-    placed = [m.copy().apply_transform(T) for m, T in zip(meshes, world)]
+    placed = [m.copy().apply_transform(T) for m, T in zip(meshes, world, strict=True)]
     if args.export_parts:
         args.export_parts.mkdir(parents=True, exist_ok=True)
-        for m, name in zip(placed, names):
+        for m, name in zip(placed, names, strict=True):
             m.export(args.export_parts / name)
 
     out = combine(placed, union=not args.no_union)

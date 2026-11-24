@@ -1,0 +1,44 @@
+name: Bug report
+description: Something doesn't work as described in the README or user guide.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. The details below help reproduce it.
+        If the problem is with particular parts, attaching the STL files (zipped) helps the most.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Paste any messages stljoiner showed.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Web interface
+        - Command line
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: stljoiner version
+      description: Output of `.venv/bin/python stljoin.py --version`
+      placeholder: stljoiner 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Your setup
+      description: Operating system, Python version and browser (for the web interface).
+      placeholder: Ubuntu 24.04, Python 3.12, Firefox 140
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: Drag a zip of the STL parts here, or describe how they were split (which tool, which cuts, connectors).
