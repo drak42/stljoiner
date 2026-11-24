@@ -113,12 +113,7 @@ def iou(p: Polygon, q: Polygon) -> float:
 
 def extract_faces(mesh: trimesh.Trimesh, part: int, max_faces: int, min_area_frac: float) -> list[Face]:
     """Find the largest planar regions of a mesh: candidates for cut faces."""
-    groups = [np.asarray(f) for f in mesh.facets]
-    in_facet = np.zeros(len(mesh.faces), dtype=bool)
-    for g in groups:
-        in_facet[g] = True
-    # Lone triangles count as planar regions too (e.g. a triangular cut face).
-    groups += [np.array([i]) for i in np.nonzero(~in_facet)[0]]
+    groups = coplanar_groups(mesh)
 
     areas = np.array([mesh.area_faces[g].sum() for g in groups])
     order = np.argsort(-areas)
@@ -127,27 +122,170 @@ def extract_faces(mesh: trimesh.Trimesh, part: int, max_faces: int, min_area_fra
     for gi in order:
         if len(faces) >= max_faces or areas[gi] < min_area_frac * total:
             break
-        g = groups[gi]
-        tri = mesh.triangles[g]
-        a = mesh.area_faces[g]
-        normal = (mesh.face_normals[g] * a[:, None]).sum(0)
-        normal /= np.linalg.norm(normal)
-        centroid = (mesh.triangles_center[g] * a[:, None]).sum(0) / a.sum()
-        basis = plane_basis(normal)
-        poly = project_polygon(tri, centroid, basis)
-        if poly.is_empty:
-            continue
-        faces.append(Face(
-            part=part, index=len(faces), normal=normal, centroid=centroid,
-            area=float(a.sum()), perimeter=float(poly.length),
-            vertices3d=tri.reshape(-1, 3), triangles=tri, basis=basis, polygon=poly,
-        ))
+        f = make_face(mesh, part, groups[gi], len(faces))
+        if f is not None:
+            faces.append(f)
     return faces
+
+
+def make_face(mesh: trimesh.Trimesh, part: int, tri_idx: np.ndarray, index: int = 0) -> Face | None:
+    """Build a Face from a set of (coplanar) triangle indices."""
+    g = np.asarray(tri_idx)
+    tri = mesh.triangles[g]
+    a = mesh.area_faces[g]
+    normal = (mesh.face_normals[g] * a[:, None]).sum(0)
+    normal /= np.linalg.norm(normal)
+    centroid = (mesh.triangles_center[g] * a[:, None]).sum(0) / a.sum()
+    basis = plane_basis(normal)
+    poly = project_polygon(tri, centroid, basis)
+    if poly.is_empty:
+        return None
+    return Face(part=part, index=index, normal=normal, centroid=centroid,
+                area=float(a.sum()), perimeter=float(poly.length),
+                vertices3d=tri.reshape(-1, 3), triangles=tri, basis=basis, polygon=poly)
+
+
+def coplanar_groups(mesh: trimesh.Trimesh) -> list[np.ndarray]:
+    """Triangle indices grouped by the plane they lie on.
+
+    Separate flat islands on the same plane form one group: a cut through a
+    hole or slot leaves several islands that together make one cut face.
+    """
+    if "coplanar_groups" in mesh._cache.cache:
+        return mesh._cache.cache["coplanar_groups"]
+    regions = [np.asarray(f) for f in mesh.facets]
+    in_facet = np.zeros(len(mesh.faces), dtype=bool)
+    for g in regions:
+        in_facet[g] = True
+    # Lone triangles count as planar regions too (e.g. a triangular cut face).
+    regions += [np.array([i]) for i in np.nonzero(~in_facet)[0]]
+
+    scale = max(float(mesh.scale), 1e-9)
+    buckets: dict[tuple, list[np.ndarray]] = {}
+    for g in regions:
+        a = mesh.area_faces[g]
+        n = (mesh.face_normals[g] * a[:, None]).sum(0)
+        norm = np.linalg.norm(n)
+        if norm == 0:
+            continue
+        n /= norm
+        d = float(np.dot(n, mesh.triangles_center[g[0]]))
+        key = tuple(np.round(n, 3)) + (round(d / (1e-4 * scale)),)
+        buckets.setdefault(key, []).append(g)
+    groups = [np.concatenate(gs) for gs in buckets.values()]
+    mesh._cache.cache["coplanar_groups"] = groups
+    return groups
+
+
+def planar_region(mesh: trimesh.Trimesh, triangle: int) -> np.ndarray:
+    """Indices of all triangles on the same plane as `triangle`."""
+    for g in coplanar_groups(mesh):
+        if triangle in g:
+            return g
+    return np.array([triangle])
 
 
 # --------------------------------------------------------------------------
 # Face matching
 # --------------------------------------------------------------------------
+
+def rotation_fits(fa: Face, fb: Face, coarse_step: float = 2.0) -> list[tuple[float, float]]:
+    """All distinct in-plane rotations (degrees) placing face b on face a.
+
+    Returns [(theta, iou), ...] sorted best first: one entry per local
+    optimum, so a symmetric face (e.g. a rectangle) yields several.
+    """
+    # R0 turns B so its face normal points opposite A's (faces touching).
+    r0 = rotation_between(fb.normal, -fa.normal)
+    tri_b = (fb.triangles - fb.centroid) @ r0.T     # B's face, centered, in world orientation
+    poly_b = project_polygon(tri_b, np.zeros(3), fa.basis)
+    if poly_b.is_empty:
+        return []
+
+    def score_at(theta_deg: float) -> float:
+        return iou(fa.polygon, affinity.rotate(poly_b, theta_deg, origin=(0, 0)))
+
+    angles = np.arange(0, 360, coarse_step)
+    scores = np.array([score_at(t) for t in angles])
+    # Local maxima of the circular score curve are the candidate rotations.
+    peaks = [i for i in range(len(scores))
+             if scores[i] >= scores[i - 1] and scores[i] >= scores[(i + 1) % len(scores)] and scores[i] > 0]
+    peaks = sorted(peaks, key=lambda i: -scores[i])[:8]
+
+    fits: list[tuple[float, float]] = []
+    for idx in peaks:
+        lo, hi = angles[idx] - coarse_step, angles[idx] + coarse_step
+        best, best_theta = scores[idx], float(angles[idx])
+        for _ in range(3):                         # successive grid refinement
+            grid = np.linspace(lo, hi, 9)
+            s = [score_at(t) for t in grid]
+            k = int(np.argmax(s))
+            span = (hi - lo) / 8
+            lo, hi = grid[k] - span, grid[k] + span
+            if s[k] > best:
+                best, best_theta = s[k], float(grid[k])
+        theta = best_theta % 360
+        if all(abs(((theta - t + 180) % 360) - 180) > 2 * coarse_step for t, *_ in fits):
+            fits.append((theta, float(best)))
+    fits.sort(key=lambda f: -f[1])
+    # Snap each rotation exactly onto the outline vertices.
+    a_pts = outline_points(fa.polygon)
+    b_pts = outline_points(poly_b)
+    return [(theta, score, *refine_2d(a_pts, b_pts, theta)) for theta, score in fits]
+
+
+def outline_points(poly) -> np.ndarray:
+    geoms = getattr(poly, "geoms", [poly])
+    pts = [np.asarray(r.coords) for g in geoms for r in [g.exterior, *g.interiors]]
+    return np.vstack(pts) if pts else np.zeros((0, 2))
+
+
+def refine_2d(a_pts: np.ndarray, b_pts: np.ndarray, theta: float, iters: int = 30) -> tuple[float, float]:
+    """Snap outline b onto outline a with 2D ICP, starting from rotation `theta`.
+
+    Returns (rotation correction in degrees, in-plane offset of b's centroid)."""
+    from scipy.spatial import cKDTree
+    if len(a_pts) < 3 or len(b_pts) < 3:
+        return (0.0, np.zeros(2))
+    tree = cKDTree(a_pts)
+    t = math.radians(theta)
+    R = np.array([[math.cos(t), -math.sin(t)], [math.sin(t), math.cos(t)]])
+    off = np.zeros(2)
+    tol = 0.05 * math.sqrt(max(np.ptp(a_pts, axis=0).prod(), 1e-12))
+    for _ in range(iters):
+        moved = b_pts @ R.T + off
+        dist, idx = tree.query(moved)
+        keep = dist < tol
+        if keep.sum() < 3:
+            break
+        src, dst = b_pts[keep], a_pts[idx[keep]]
+        sc, dc = src.mean(0), dst.mean(0)
+        H = (src - sc).T @ (dst - dc)
+        U, _, Vt = np.linalg.svd(H)
+        Rn = Vt.T @ U.T
+        if np.linalg.det(Rn) < 0:
+            Vt[-1] *= -1
+            Rn = Vt.T @ U.T
+        off_n = dc - Rn @ sc
+        done = np.allclose(Rn, R, atol=1e-12) and np.allclose(off_n, off, atol=1e-12)
+        R, off = Rn, off_n
+        if done:
+            break
+    dtheta = math.degrees(math.atan2(R[1, 0], R[0, 0])) - theta
+    return (dtheta, off)
+
+
+def placement(fa: Face, fb: Face, theta: float, dtheta: float = 0.0, offset=(0.0, 0.0)) -> np.ndarray:
+    """4x4 transform putting face b against face a, rotated theta degrees in-plane
+    (plus an optional exact correction dtheta and in-plane offset from refine_2d)."""
+    r0 = rotation_between(fb.normal, -fa.normal)
+    r_theta = trimesh.transformations.rotation_matrix(math.radians(theta + dtheta), fa.normal)[:3, :3]
+    rot = r_theta @ r0
+    T = np.eye(4)
+    T[:3, :3] = rot
+    T[:3, 3] = fa.centroid + np.asarray(offset) @ fa.basis - rot @ fb.centroid
+    return T
+
 
 def match_faces(fa: Face, fb: Face, mesh_b: trimesh.Trimesh, tol: float, coarse_step: float = 2.0) -> Match | None:
     """Try to place face b of part B onto face a of part A.
@@ -161,45 +299,13 @@ def match_faces(fa: Face, fb: Face, mesh_b: trimesh.Trimesh, tol: float, coarse_
     if abs(fa.perimeter - fb.perimeter) > 2 * tol * max(fa.perimeter, fb.perimeter):
         return None
 
-    # R0 turns B so its face normal points opposite A's (faces touching).
-    r0 = rotation_between(fb.normal, -fa.normal)
-    tri_b = (fb.triangles - fb.centroid) @ r0.T     # B's face, centered, in world orientation
-    poly_b = project_polygon(tri_b, np.zeros(3), fa.basis)
-    if poly_b.is_empty:
+    fits = rotation_fits(fa, fb, coarse_step)
+    if not fits or fits[0][1] < 1 - tol:
         return None
-
-    def score_at(theta_deg: float) -> float:
-        return iou(fa.polygon, affinity.rotate(poly_b, theta_deg, origin=(0, 0)))
-
-    # Coarse search over in-plane rotation, then refine the best few.
-    angles = np.arange(0, 360, coarse_step)
-    scores = np.array([score_at(t) for t in angles])
-    best_theta, best = 0.0, -1.0
-    for idx in np.argsort(-scores)[:4]:
-        lo, hi = angles[idx] - coarse_step, angles[idx] + coarse_step
-        for _ in range(3):                         # successive grid refinement
-            grid = np.linspace(lo, hi, 9)
-            s = [score_at(t) for t in grid]
-            k = int(np.argmax(s))
-            span = (hi - lo) / 8
-            lo, hi = grid[k] - span, grid[k] + span
-            if s[k] > best:
-                best, best_theta = s[k], float(grid[k])
-
-    if best < 1 - tol:
-        return None
-
-    # Other well-separated rotations that fit almost as well => symmetric face.
-    sep = np.abs(((angles - best_theta + 180) % 360) - 180) > 3 * coarse_step
-    ambiguous = bool(np.any(scores[sep] > best - 0.02))
-
-    # Full transform: center B's face at origin, R0, rotate theta about A's
-    # normal, move to A's face centroid.
-    r_theta = trimesh.transformations.rotation_matrix(math.radians(best_theta), fa.normal)[:3, :3]
-    rot = r_theta @ r0
-    T = np.eye(4)
-    T[:3, :3] = rot
-    T[:3, 3] = fa.centroid - rot @ fb.centroid
+    best_theta, best, dtheta, offset = fits[0]
+    # Another rotation that fits almost as well => symmetric face.
+    ambiguous = len(fits) > 1 and fits[1][1] > best - 0.02
+    T = placement(fa, fb, best_theta, dtheta, offset)
 
     # B's body must end up on the far side of the face, not inside A.
     side = np.dot(trimesh.transform_points([mesh_b.center_mass if mesh_b.is_volume else mesh_b.centroid], T)[0] - fa.centroid, fa.normal)
@@ -298,8 +404,28 @@ def assemble(meshes: list[trimesh.Trimesh], names: list[str], *, max_faces: int,
     return world, chosen
 
 
+def snap_seams(meshes: list[trimesh.Trimesh], eps: float = 1e-3) -> list[trimesh.Trimesh]:
+    """Weld vertices that sit within eps (mm) of a vertex on another part.
+
+    Aligned parts meet at faces that are coincident only to float precision;
+    left as-is, the boolean union turns the tiny offsets into sliver triangles.
+    """
+    from scipy.spatial import cKDTree
+    out = [m.copy() for m in meshes]
+    for i in range(1, len(out)):
+        ref = np.vstack([m.vertices for m in out[:i]])
+        dist, idx = cKDTree(ref).query(out[i].vertices, distance_upper_bound=eps)
+        hit = np.isfinite(dist)
+        if hit.any():
+            v = out[i].vertices.copy()
+            v[hit] = ref[idx[hit]]
+            out[i].vertices = v
+    return out
+
+
 def combine(meshes: list[trimesh.Trimesh], union: bool) -> trimesh.Trimesh:
     if union and len(meshes) > 1:
+        meshes = snap_seams(meshes)
         try:
             return trimesh.boolean.union(meshes, engine="manifold")
         except Exception as exc:  # non-watertight input, etc.

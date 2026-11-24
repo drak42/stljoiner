@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>stljoiner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f6fde; --a: #f5b700; --b: #00b3c7; --danger: #c43d3d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+  #app { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
+  header { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .01em; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  section { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  #drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px; text-align: center; color: var(--muted); cursor: pointer; }
+  #drop.over { border-color: var(--accent); color: var(--accent); background: #2f6fde0d; }
+  #parts { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+  #parts-wrap { flex: 1; overflow-y: auto; }
+  .part { display: grid; grid-template-columns: auto 12px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-radius: 6px; }
+  .part:hover { background: #00000008; }
+  .part.off .name { color: var(--muted); }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grp { font-size: 11px; color: var(--muted); }
+  .acts button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px 4px; font-size: 12px; }
+  .acts button:hover { color: var(--ink); }
+  .acts button.del:hover { color: var(--danger); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
+  button.btn:hover:not(:disabled) { border-color: #c9c9c2; }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn:disabled { opacity: .45; cursor: default; }
+  .facesel { display: grid; grid-template-columns: 16px 1fr; gap: 4px 8px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+  #status { padding: 10px 16px; font-size: 12px; color: var(--muted); min-height: 38px; }
+  #status.err { color: var(--danger); }
+  main { position: relative; }
+  #view { position: absolute; inset: 0; }
+  #empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
+  #toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  label.chk { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+  #rot { margin-top: 8px; font-size: 13px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <header>
+      <h1>stljoiner</h1>
+      <p>Put split STL parts back together by their mating faces.</p>
+    </header>
+    <section>
+      <div id="drop">Drop STL files here or <u>browse</u></div>
+      <input id="file" type="file" accept=".stl" multiple hidden>
+    </section>
+    <section id="parts-wrap">
+      <h2>Parts <span class="grp">· checked parts take part in joining and export</span></h2>
+      <ul id="parts"></ul>
+    </section>
+    <section>
+      <h2>Join by faces</h2>
+      <p class="hint">Click the mating face on one part (A), then the matching face on another part (B). B moves onto A.</p>
+      <div class="facesel">
+        <span class="dot" style="background:var(--a)"></span><span id="fa">Face A: none</span>
+        <span class="dot" style="background:var(--b)"></span><span id="fb">Face B: none</span>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="join" disabled>Join B → A</button>
+        <button class="btn" id="clear">Clear</button>
+      </div>
+      <div id="rot" hidden></div>
+    </section>
+    <section>
+      <h2>Selected parts</h2>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" id="auto">Auto-join</button>
+        <button class="btn" id="undo">Undo</button>
+        <button class="btn" id="reset">Reset positions</button>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="export">Export STL</button>
+        <label class="chk"><input type="checkbox" id="union" checked> merge into one solid</label>
+      </div>
+    </section>
+    <div id="status"></div>
+  </aside>
+  <main>
+    <div id="view"></div>
+    <div id="empty">Add some STL parts to get started</div>
+    <div id="toolbar"><button class="btn" id="fit">Fit view</button></div>
+  </main>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+const $ = id => document.getElementById(id);
+const loader = new STLLoader();
+
+// ---------------- three.js scene ----------------
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setClearColor(0xf6f6f4);
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100000);
+camera.up.set(0, 0, 1);                      // STL files are usually Z-up
+camera.position.set(200, -300, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+scene.add(sun);
+const grid = new THREE.GridHelper(400, 40, 0xd0d0c8, 0xe4e4de);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+
+function resize() {
+  const { clientWidth: w, clientHeight: h } = view;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+renderer.setAnimationLoop(() => {
+  controls.update();
+  sun.position.copy(camera.position);
+  renderer.render(scene, camera);
+});
+
+// ---------------- state ----------------
+const meshes = new Map();       // part id -> { mesh, version, info }
+const selected = new Set();     // checked part ids
+let parts = [];
+let faceA = null, faceB = null; // { part, triangle, triangles, area, overlay }
+let pending = null;
+
+function setStatus(msg, err = false) {
+  $('status').textContent = msg || '';
+  $('status').classList.toggle('err', err);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res;
+}
+const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+// Apply a server state: refresh changed meshes, rebuild the list.
+async function applyState(state) {
+  const firstLoad = meshes.size === 0;
+  parts = state.parts;
+  pending = state.pending;
+  const ids = new Set(parts.map(p => p.id));
+  for (const [id, entry] of meshes) {
+    if (!ids.has(id)) { scene.remove(entry.mesh); entry.mesh.geometry.dispose(); meshes.delete(id); selected.delete(id); }
+  }
+  await Promise.all(parts.map(async p => {
+    let entry = meshes.get(p.id);
+    if (!entry) {
+      selected.add(p.id);
+      const mat = new THREE.MeshStandardMaterial({ color: p.color, roughness: .65, metalness: .05, transparent: true });
+      entry = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), mat), version: -1 };
+      entry.mesh.userData.id = p.id;
+      scene.add(entry.mesh);
+      meshes.set(p.id, entry);
+    }
+    entry.info = p;
+    if (entry.version !== p.version) {
+      const buf = await (await api(`/api/parts/${p.id}/mesh`)).arrayBuffer();
+      entry.mesh.geometry.dispose();
+      entry.mesh.geometry = loader.parse(buf);
+      entry.version = p.version;
+      // Any face picked on a moved part is stale now.
+      for (const f of [faceA, faceB]) if (f && f.part === p.id) clearFaces();
+    }
+  }));
+  $('undo').disabled = !state.canUndo;
+  renderParts();
+  renderSelection();
+  renderRotation();
+  $('empty').hidden = parts.length > 0;
+  if (firstLoad && parts.length) fitView();
+}
+
+function groupLabel(p) {
+  const members = parts.filter(q => q.group === p.group);
+  if (members.length < 2) return '';
+  const n = [...new Set(parts.map(q => q.group))].filter(g => parts.filter(q => q.group === g).length > 1).indexOf(p.group) + 1;
+  return `joined #${n}`;
+}
+
+function renderParts() {
+  const ul = $('parts');
+  ul.innerHTML = '';
+  for (const p of parts) {
+    const on = selected.has(p.id);
+    const li = document.createElement('li');
+    li.className = 'part' + (on ? '' : ' off');
+    li.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''}>
+      <span class="swatch" style="background:${p.color}"></span>
+      <span class="name" title="${p.name}">${p.name}${p.watertight ? '' : ' ⚠'} <span class="grp">${groupLabel(p)}</span></span>
+      <span class="acts">${groupLabel(p) ? '<button class="unj" title="Detach from its group">detach</button>' : ''}<button class="del" title="Remove">✕</button></span>`;
+    li.querySelector('input').onchange = e => {
+      e.target.checked ? selected.add(p.id) : selected.delete(p.id);
+      for (const f of [faceA, faceB]) if (f && f.part === p.id && !e.target.checked) clearFaces();
+      renderParts();
+    };
+    li.querySelector('.del').onclick = () => run(async () => applyState(await (await api(`/api/parts/${p.id}`, { method: 'DELETE' })).json()));
+    const unj = li.querySelector('.unj');
+    if (unj) unj.onclick = () => run(async () => applyState(await (await post(`/api/unjoin/${p.id}`)).json()), 'Detached ' + p.name);
+    ul.appendChild(li);
+  }
+  // Unselected parts are ghosted and can't be picked.
+  for (const [id, { mesh }] of meshes) {
+    const on = selected.has(id);
+    mesh.material.opacity = on ? 1 : 0.12;
+    mesh.material.depthWrite = on;
+  }
+  $('auto').disabled = $('export').disabled = selected.size === 0;
+}
+
+function partName(id) { return parts.find(p => p.id === id)?.name ?? '?'; }
+
+function renderSelection() {
+  $('fa').textContent = faceA ? `Face A: ${partName(faceA.part)} (${faceA.area} mm²)` : 'Face A: click a face';
+  $('fb').textContent = faceB ? `Face B: ${partName(faceB.part)} (${faceB.area} mm²)` : (faceA ? 'Face B: click a face on another part' : 'Face B: none');
+  $('join').disabled = !(faceA && faceB);
+}
+
+function renderRotation() {
+  const el = $('rot');
+  if (!pending) { el.hidden = true; return; }
+  const { fits, index } = pending;
+  el.hidden = false;
+  el.innerHTML = `Fit <b>${fits[index]}%</b>` +
+    (fits.length > 1 ? ` · rotation ${index + 1} of ${fits.length} <button class="btn" id="nextrot" style="margin-left:6px">Next rotation</button>` : '');
+  const btn = $('nextrot');
+  if (btn) btn.onclick = () => run(async () => applyState(await (await post('/api/join/rotation', { index: (index + 1) % fits.length })).json()));
+}
+
+// ---------------- face picking ----------------
+const ray = new THREE.Raycaster();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;   // was a drag
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+  const pickable = [...meshes.entries()].filter(([id]) => selected.has(id)).map(([, m]) => m.mesh);
+  const hit = ray.intersectObjects(pickable, false)[0];
+  if (hit) pickFace(hit.object.userData.id, hit.faceIndex);
+});
+
+async function pickFace(part, triangle) {
+  const info = await (await post('/api/face', { part, triangle })).json();
+  const face = { part, triangle, area: info.area, overlay: overlay(part, info.triangles) };
+  const group = id => parts.find(p => p.id === id)?.group;
+  if (!faceA || faceA.part === part || (faceA && faceB)) {
+    // Start over: new face A (or replace A on the same part).
+    clearFaces();
+    faceA = face; faceA.overlay.material.color.set(getComputedStyle(document.body).getPropertyValue('--a'));
+  } else if (group(faceA.part) === group(part)) {
+    setStatus('That part is already joined to part A — pick a face on a separate part.', true);
+    scene.remove(face.overlay);
+    return;
+  } else {
+    faceB = face; faceB.overlay.material.color.set(getComputedStyle(document.body).getPropertyValue('--b'));
+  }
+  setStatus('');
+  renderSelection();
+}
+
+function overlay(part, tris) {
+  const src = meshes.get(part).mesh.geometry.attributes.position.array;
+  const pos = new Float32Array(tris.length * 9);
+  tris.forEach((t, i) => pos.set(src.subarray(t * 9, t * 9 + 9), i * 9));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  scene.add(m);
+  return m;
+}
+
+function clearFaces() {
+  for (const f of [faceA, faceB]) if (f) { scene.remove(f.overlay); f.overlay.geometry.dispose(); }
+  faceA = faceB = null;
+  renderSelection();
+}
+
+// ---------------- actions ----------------
+async function run(fn, okMsg) {
+  try { setStatus('Working…'); await fn(); setStatus(okMsg || ''); }
+  catch (e) { setStatus(e.message, true); }
+}
+
+$('join').onclick = () => run(async () => {
+  const body = { a: faceA.part, faceA: faceA.triangle, b: faceB.part, faceB: faceB.triangle };
+  const msgParts = [partName(faceB.part), partName(faceA.part)];
+  clearFaces();
+  await applyState(await (await post('/api/join', body)).json());
+  const f = pending.fits;
+  setStatus(`Joined ${msgParts[0]} → ${msgParts[1]}.` + (f.length > 1 ? ` ${f.length} rotations fit this face; use "Next rotation" if it's turned wrong.` : ''));
+}, null);
+$('clear').onclick = () => { clearFaces(); setStatus(''); };
+
+$('auto').onclick = () => run(async () => {
+  const state = await (await post('/api/auto', { ids: [...selected] })).json();
+  await applyState(state);
+  const lines = state.joins.map(j => `${j.b} → ${j.a} (${j.fit}%${j.inPlace ? ', in place' : ''}${j.ambiguous ? ', ⚠ symmetric face: check rotation' : ''})`);
+  setStatus('Auto-joined: ' + lines.join('; '));
+}, null);
+
+$('undo').onclick = () => run(async () => applyState(await (await post('/api/undo')).json()));
+$('reset').onclick = () => run(async () => applyState(await (await post('/api/reset')).json()), 'Positions reset to the files’ originals.');
+
+$('export').onclick = () => run(async () => {
+  const res = await post('/api/export', { ids: [...selected], union: $('union').checked });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: 'joined.stl' });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}, 'Exported joined.stl');
+
+$('fit').onclick = fitView;
+function fitView() {
+  const box = new THREE.Box3();
+  for (const [id, { mesh }] of meshes) if (selected.has(id)) box.expandByObject(mesh);
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() / 2;
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  controls.target.copy(c);
+  camera.position.copy(c).addScaledVector(dir, r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)));
+  grid.position.set(c.x, c.y, box.min.z);
+}
+
+// ---------------- upload ----------------
+async function upload(files) {
+  const fd = new FormData();
+  for (const f of files) if (/\.stl$/i.test(f.name)) fd.append('files', f);
+  if (!fd.has('files')) return setStatus('Only .stl files are supported.', true);
+  await run(async () => {
+    const state = await (await api('/api/parts', { method: 'POST', body: fd })).json();
+    await applyState(state);
+    fitView();
+    if (state.errors?.length) throw new Error(state.errors.join('; '));
+  }, 'Loaded. Click a face on one part, then its mate on another.');
+}
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+$('file').onchange = e => { upload(e.target.files); e.target.value = ''; };
+for (const t of [drop, view]) {
+  t.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  t.addEventListener('dragleave', () => drop.classList.remove('over'));
+  t.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); upload(e.dataTransfer.files); });
+}
+addEventListener('keydown', e => { if (e.key === 'Escape') clearFaces(); });
+
+applyState(await (await api('/api/state')).json());
+</script>
+</body>
+</html>
