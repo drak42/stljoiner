@@ -27,6 +27,7 @@ Useful context when judging a problem:
 - It has **no login**. Starting it with `stljoiner web --host` set to another
   address (for example `0.0.0.0`) lets anyone who can reach that address use
   it, and turns off the host-name check. It prints a warning when you do.
-- The page loads three.js from the jsDelivr CDN.
+- The page loads nothing from the internet: the 3D viewer (three.js) ships
+  inside the package.
 - A way for another website, or another user on the computer, to make the
   default (`127.0.0.1`) server act is a security problem worth reporting.

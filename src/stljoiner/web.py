@@ -132,15 +132,15 @@ def upload():
     errors = []
     with lock:
         for f in files:
+            filename = Path(f.filename or "part.stl").name
             try:
-                m = trimesh.load(io.BytesIO(f.read()), file_type="stl", force="mesh")
-                m.merge_vertices()
+                parts = stljoin.load_parts(io.BytesIO(f.read()), filename)
             except Exception as exc:  # noqa: BLE001 - report any unreadable file back to the page
-                errors.append(f"{f.filename}: {exc}")
+                errors.append(f"{filename}: {exc}")
                 continue
-            pid = next(S.ids)
-            S.parts[pid] = Part(id=pid, name=f.filename or f"part{pid}.stl", mesh=m,
-                                color=PALETTE[(pid - 1) % len(PALETTE)], group=pid)
+            for name, m in parts:
+                pid = next(S.ids)
+                S.parts[pid] = Part(id=pid, name=name, mesh=m, color=PALETTE[(pid - 1) % len(PALETTE)], group=pid)
         S.pending = None
         out = S.state()
     out["errors"] = errors
@@ -180,6 +180,65 @@ def face():
             return error("bad triangle index")
         region = stljoin.planar_region(m, tri)
         return jsonify({"triangles": region.tolist(), "area": round(float(m.area_faces[region].sum()), 2)})
+
+
+@app.post("/api/suggest")
+def suggest():
+    """Faces on the other checked parts that best fit the clicked face, best first."""
+    body = request.get_json()
+    with lock:
+        a = S.parts.get(body.get("part"))
+        if a is None:
+            return error("no such part", 404)
+        ma = a.placed()
+        tri = int(body.get("triangle", -1))
+        if not 0 <= tri < len(ma.faces):
+            return error("bad triangle index")
+        fa = stljoin.make_face(ma, a.id, stljoin.planar_region(ma, tri))
+        if fa is None:
+            return error("couldn't read the selected face")
+        ids = body.get("ids") or list(S.parts)
+        found = []
+        for pid in ids:
+            b = S.parts.get(pid)
+            if b is None or b.group == a.group:
+                continue
+            for fb in stljoin.extract_faces(b.placed(), b.id, max_faces=16, min_area_frac=0.002):
+                if abs(fa.area - fb.area) > 0.15 * max(fa.area, fb.area):
+                    continue
+                fits = stljoin.rotation_fits(fa, fb)
+                if fits and fits[0][1] >= 0.5:
+                    found.append({"part": b.id, "triangle": int(fb.tri_index[0]),
+                                  "triangles": fb.tri_index.tolist(), "area": round(fb.area, 2),
+                                  "fit": round(fits[0][1] * 100, 1)})
+        found.sort(key=lambda f: -f["fit"])
+        return jsonify({"suggestions": found[:5]})
+
+
+@app.post("/api/nudge")
+def nudge():
+    """Move a part and everything joined to it: {part, move: [dx, dy, dz]} or {part, axis, degrees}."""
+    body = request.get_json()
+    with lock:
+        p = S.parts.get(body.get("part"))
+        if p is None:
+            return error("no such part", 404)
+        members = S.group_members(p.group)
+        if "move" in body:
+            T = np.eye(4)
+            T[:3, 3] = [float(v) for v in body["move"]]
+        else:
+            axis = {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}.get(body.get("axis"))
+            if axis is None:
+                return error("axis must be x, y or z")
+            bounds = np.vstack([m.placed().bounds for m in members])
+            center = (bounds.min(0) + bounds.max(0)) / 2
+            T = trimesh.transformations.rotation_matrix(np.radians(float(body.get("degrees", 90))), axis, center)
+        S.snapshot()
+        S.pending = None
+        for m in members:
+            m.move(T @ m.world)
+        return jsonify(S.state())
 
 
 def _apply_pending(index: int) -> None:
@@ -305,14 +364,17 @@ def reset():
 def export():
     body = request.get_json()
     ids = body.get("ids") or list(S.parts)
+    fmt = str(body.get("format", "stl")).lower()
+    if fmt not in stljoin.OUTPUT_FORMATS:
+        return error(f"unsupported format '{fmt}'")
     with lock:
         parts = [S.parts[i] for i in ids if i in S.parts]
         if not parts:
             return error("no parts selected")
-        out = stljoin.combine([p.placed() for p in parts], union=bool(body.get("union", True)))
-        data = out.export(file_type="stl")
-    name = body.get("filename") or "joined.stl"
-    return send_file(io.BytesIO(data), mimetype="model/stl", as_attachment=True, download_name=name)
+        data = stljoin.export_result([p.placed() for p in parts], [p.name for p in parts], fmt,
+                                     union=bool(body.get("union", True)))
+    return send_file(io.BytesIO(data), mimetype="application/octet-stream", as_attachment=True,
+                     download_name=f"joined.{fmt}")
 
 
 def main(argv: list[str] | None = None) -> int:

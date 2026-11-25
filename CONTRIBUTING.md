@@ -27,16 +27,24 @@ Before committing, run the same checks as GitHub Actions:
 .venv/bin/python -m build && .venv/bin/twine check --strict dist/*
 ```
 
+`tests/test_browser.py` drives the web page in a real browser. It's skipped unless Playwright and Google Chrome (or Chromium) are installed:
+
+```bash
+.venv/bin/pip install playwright
+.venv/bin/pytest tests/test_browser.py
+```
+
 ## Project layout
 
 | Path | What it is |
 |---|---|
 | `src/stljoiner/join.py` | The joining engine and the `stljoiner` command line: face extraction, matching, alignment, assembly, union. |
 | `src/stljoiner/web.py` | The Flask web server (`stljoiner web`) and its JSON API. |
-| `src/stljoiner/static/index.html` | The web page (three.js viewer, face picking). |
+| `src/stljoiner/static/index.html` | The web page (3D viewer, face picking, suggestions). |
+| `src/stljoiner/static/vendor/three/` | three.js r170 (MIT, see its LICENSE), bundled so the page works offline. |
 | `src/stljoiner/cli.py` | Sends `stljoiner web` to the web server and everything else to the joiner. |
 | `src/stljoiner/version.py` | The version number (the only place it is set). |
-| `tests/` | pytest suite. `make_test_parts.py` builds the split L-bracket the tests and media use. |
+| `tests/` | pytest suite. `make_test_parts.py` builds the test parts: the split L-bracket (also used by the media), plus connector, stepped and dovetail cuts. |
 | `docs/USER_GUIDE.md` | The user guide. |
 | `docs/images/` | README media. `make_media.py` regenerates them. |
 

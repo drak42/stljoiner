@@ -104,3 +104,61 @@ def test_cli_dispatches_web(monkeypatch):
     assert cli_main(["web", "--port", "4399"]) == 0
     assert seen["port"] == 4399
     assert seen["host"] == "127.0.0.1"
+
+
+@pytest.mark.parametrize("kind", ["connector", "stepped", "dovetail"])
+@pytest.mark.parametrize("seed", [1, 2])
+def test_auto_join_cut_types(kind, seed):
+    """Pegs and holes, stepped cuts and dovetails rebuild from scattered pieces."""
+    import make_test_parts as mt
+
+    original, pieces = getattr(mt, f"{kind}_pieces")()
+    scattered = mt.scatter(pieces, seed)
+    world, chosen = stljoin.assemble(scattered, ["L", "R"], max_faces=12, min_area_frac=0.005, tol=0.05,
+                                     verbose=False)
+    assert len(chosen) == 1
+    out = stljoin.combine([p.copy().apply_transform(w) for p, w in zip(scattered, world, strict=True)], union=True)
+    assert out.is_watertight
+    assert out.convex_hull.volume == pytest.approx(original.convex_hull.volume, rel=1e-3)
+
+
+def test_overlap_volume():
+    a = trimesh.creation.box([10, 10, 10])
+    touching = a.copy().apply_translation([10, 0, 0])
+    inside = a.copy().apply_translation([5, 0, 0])
+    assert stljoin.overlap_volume(a, touching) == pytest.approx(0, abs=1e-6)
+    assert stljoin.overlap_volume(a, inside) == pytest.approx(500, rel=1e-6)
+
+
+def test_look_alike_faces_are_flagged(scattered):
+    """The bracket's plain end has the same outline as a cut: auto-join must say it's unsure."""
+    meshes = [load(p) for p in scattered]
+    _, chosen = stljoin.assemble(meshes, ["a", "b", "c"], max_faces=12, min_area_frac=0.005, tol=0.05,
+                                 verbose=False)
+    unique = [m for m in chosen if round(m.a.area) == 840]
+    assert unique and not unique[0].ambiguous      # the notched cut face is certain
+    assert any(m.ambiguous for m in chosen)        # the plain rectangle is not
+
+
+@pytest.mark.parametrize("ext", ["3mf", "obj", "ply", "glb"])
+def test_cli_output_formats(in_place, tmp_path, ext):
+    out = tmp_path / f"joined.{ext}"
+    assert cli_main([*map(str, in_place), "-o", str(out), "-q"]) == 0
+    (_, mesh), = stljoin.load_parts(out, out.name)
+    assert mesh.volume == pytest.approx(original_of(in_place).volume, rel=1e-4)
+
+
+def test_cli_3mf_kit_in_and_out(in_place, tmp_path):
+    """--no-union 3MF keeps the parts as objects, and a 3MF of parts can be joined directly."""
+    kit = tmp_path / "kit.3mf"
+    assert cli_main([*map(str, in_place), "-o", str(kit), "--no-union", "-q"]) == 0
+    assert len(stljoin.load_parts(kit, kit.name)) == 3
+    out = tmp_path / "joined.stl"
+    assert cli_main([str(kit), "-o", str(out), "-q"]) == 0
+    assert trimesh.load_mesh(out).is_watertight
+
+
+def test_cli_rejects_unknown_formats(in_place, tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        cli_main([*map(str, in_place), "-o", str(tmp_path / "out.xyz")])
+    assert "can't write '.xyz'" in capsys.readouterr().err

@@ -17,6 +17,24 @@ Install from PyPI.
 - Release workflow: pushing a version tag creates the GitHub release and
   uploads the package to PyPI.
 - CI also runs on Windows and macOS and checks that the package builds.
+- Face suggestions in the web interface: click face A and the best-fitting
+  faces on the other checked parts light up and are listed by fit. Press S
+  (or click one) to take it.
+- Auto-join understands stepped and dovetailed cuts: face matches that agree
+  on the same placement count as one strong joint. Pegs and holes with
+  clearance match too.
+- Auto-join never pushes one part into another, trusts faces that fit only
+  one partner over plain faces that fit many, and marks joints that are a
+  guess with ⚠.
+- Mesh formats: read STL, 3MF, OBJ, PLY, OFF and GLB. A 3MF or GLB with
+  several objects loads as several parts. Write STL, 3MF, OBJ, PLY, OFF or
+  GLB (`-o` extension on the command line, a format menu in the page).
+  Unmerged 3MF/GLB keeps each part as its own object.
+- Adjust panel: move a part (and what's joined to it) by a step, or turn it
+  90°.
+- Green-screen theme, keyboard shortcuts (press ? in the page), and the
+  page remembers your theme, export format and unchecked parts.
+- An optional end-to-end browser test (`tests/test_browser.py`).
 
 ### Changed
 
@@ -24,6 +42,14 @@ Install from PyPI.
   `stljoiner web` replaces `python app.py`. The code now lives in
   `src/stljoiner/`.
 - Dependencies are listed in `pyproject.toml`. `requirements.txt` is gone.
+- The web page works offline: three.js is bundled instead of loaded from a
+  CDN.
+- Picked and suggested faces show through the model, so they're never
+  hidden.
+
+### Fixed
+
+- The disabled Join button no longer looks active in the green-screen theme.
 
 ## [0.1.0] - 2026-11-25
 

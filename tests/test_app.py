@@ -97,3 +97,73 @@ def test_unselected_parts_left_out(client, in_place):
 def test_other_host_names_refused(client):
     assert client.get("/", headers={"Host": "evil.example:4300"}).status_code == 403
     assert client.get("/", headers={"Host": "127.0.0.1:4300"}).status_code == 200
+
+
+def test_three_js_served_locally(client):
+    page = client.get("/").data.decode()
+    assert "cdn.jsdelivr" not in page
+    for path in ("/static/vendor/three/three.module.min.js", "/static/vendor/three/addons/OrbitControls.js",
+                 "/static/vendor/three/addons/STLLoader.js"):
+        assert client.get(path).status_code == 200, path
+
+
+def test_suggest_finds_the_mating_face(client, scattered):
+    ids = upload(client, scattered)
+    res = client.post("/api/suggest", json={"part": ids[0], "triangle": face_tri(ids[0], 840), "ids": ids}).get_json()
+    best = res["suggestions"][0]
+    assert best["part"] == ids[1]
+    assert best["fit"] == 100.0
+    assert best["area"] == pytest.approx(840, abs=0.5)
+    # The suggestion's triangle is a valid face B for a join.
+    res = client.post("/api/join", json={"a": ids[0], "faceA": face_tri(ids[0], 840),
+                                         "b": ids[1], "faceB": best["triangle"]}).get_json()
+    assert res["pending"]["fits"] == [100.0]
+
+
+def test_suggest_skips_unchecked_and_joined_parts(client, in_place):
+    ids = upload(client, in_place)
+    res = client.post("/api/suggest", json={"part": ids[0], "triangle": face_tri(ids[0], 840), "ids": [ids[0]]})
+    assert res.get_json()["suggestions"] == []
+
+
+def test_nudge_moves_whole_group(client, in_place):
+    ids = upload(client, in_place)
+    client.post("/api/auto", json={"ids": ids[:2]})
+    before = [webapp.S.parts[i].placed().bounds.copy() for i in ids]
+    client.post("/api/nudge", json={"part": ids[1], "move": [0, 0, 5]})
+    after = [webapp.S.parts[i].placed().bounds for i in ids]
+    assert after[0][0][2] == pytest.approx(before[0][0][2] + 5)   # joined to part 1: moved
+    assert after[1][0][2] == pytest.approx(before[1][0][2] + 5)
+    assert after[2][0][2] == pytest.approx(before[2][0][2])       # separate: stayed
+    client.post("/api/nudge", json={"part": ids[2], "axis": "z", "degrees": 90})
+    ext = webapp.S.parts[ids[2]].placed().extents
+    assert ext[0] == pytest.approx(40) and ext[1] == pytest.approx(35)
+    assert client.post("/api/undo").status_code == 200
+    assert client.post("/api/nudge", json={"part": ids[2], "axis": "w"}).status_code == 400
+
+
+@pytest.mark.parametrize("fmt", ["stl", "3mf", "obj", "ply", "glb"])
+def test_export_formats(client, in_place, fmt):
+    ids = upload(client, in_place)
+    res = client.post("/api/export", json={"ids": ids, "union": True, "format": fmt})
+    assert res.status_code == 200
+    out = stljoin.load_parts(io.BytesIO(res.data), f"joined.{fmt}")
+    assert len(out) == 1
+    assert out[0][1].volume == pytest.approx(200628.8, rel=1e-4)
+
+
+def test_unmerged_3mf_keeps_parts_and_reloads_as_parts(client, in_place):
+    ids = upload(client, in_place)
+    data = client.post("/api/export", json={"ids": ids, "union": False, "format": "3mf"}).data
+    assert len(stljoin.load_parts(io.BytesIO(data), "kit.3mf")) == 3
+    webapp.S = webapp.Session()
+    res = client.post("/api/parts", data={"files": [(io.BytesIO(data), "kit.3mf")]},
+                      content_type="multipart/form-data").get_json()
+    assert [p["name"] for p in res["parts"]] == ["kit.3mf: piece0", "kit.3mf: piece1", "kit.3mf: piece2"]
+
+
+def test_bad_upload_reported(client):
+    res = client.post("/api/parts", data={"files": [(io.BytesIO(b"nope"), "notes.txt")]},
+                      content_type="multipart/form-data").get_json()
+    assert res["parts"] == []
+    assert "unsupported file type" in res["errors"][0]

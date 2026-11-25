@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Christopher Eslick" }]
-keywords = ["3d-printing", "stl", "mesh", "join", "merge", "split", "assembly", "trimesh"]
+keywords = ["3d-printing", "stl", "3mf", "mesh", "join", "merge", "split", "assembly", "trimesh"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -36,6 +36,7 @@ dependencies = [
     "networkx",
     "rtree",
     "flask>=3",
+    "lxml",
 ]
 
 [project.optional-dependencies]
@@ -60,7 +61,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-stljoiner = ["static/*"]
+stljoiner = ["static/*.html", "static/vendor/three/*", "static/vendor/three/addons/*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "stljoiner.version.__version__" }
