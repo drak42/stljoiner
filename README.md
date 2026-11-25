@@ -2,6 +2,7 @@
 
 ![stljoiner: STL code rain, a green-screen console joining three bracket pieces, and the pieces pulled apart with their cut faces lit](https://raw.githubusercontent.com/drak42/stljoiner/main/docs/images/banner.png)
 
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/stljoiner?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/stljoiner)
 [![CI](https://github.com/drak42/stljoiner/actions/workflows/ci.yml/badge.svg)](https://github.com/drak42/stljoiner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/drak42/stljoiner/blob/main/LICENSE)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/drak42)
