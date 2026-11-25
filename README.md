@@ -97,6 +97,15 @@ stljoiner a.stl b.stl --no-union -o placed.3mf         # placed, kept as separat
 - [Contributing](https://github.com/drak42/stljoiner/blob/main/CONTRIBUTING.md)
 - [Security](https://github.com/drak42/stljoiner/blob/main/SECURITY.md)
 
+## Companion projects
+
+Two more free tools from the same author, for the steps after joining:
+
+- **[BlendSVG](https://github.com/drak42/blendsvg)** cuts SVG artwork into a model as flush colour inlays, as a 3MF with one part per colour. A Blender add-on, with a command line.
+- **[BatchSlicer](https://github.com/drak42/batch_slicer)** slices one model or whole folders with your own OrcaSlicer, Bambu Studio or Creality Print presets, matches multi-colour parts to the filaments loaded in a Creality CFS, and sends the G-code to Klipper or OctoPrint. `pipx install batchslicer`.
+
+Together: join a model with stljoiner, add your logo with BlendSVG, then slice it and send it to the printer with BatchSlicer. A 3MF saved with `--no-union` keeps each piece as its own object, so each can be given its own colour in the slicer.
+
 ## Support
 
 stljoiner is free and open source. If it saves a print or two, you can [buy me a coffee](https://buymeacoffee.com/drak42) ☕. Bug reports, ideas and pull requests are just as welcome: see [CONTRIBUTING.md](https://github.com/drak42/stljoiner/blob/main/CONTRIBUTING.md).
