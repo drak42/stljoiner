@@ -6,7 +6,9 @@ All notable changes to stljoiner are recorded here. The format follows
 
 ## [Unreleased]
 
-Install from PyPI.
+## [0.2.0] - 2026-11-25
+
+Install from PyPI, face suggestions, smarter auto-join and more file formats.
 
 ### Added
 
@@ -74,5 +76,6 @@ First release.
   result is watertight.
 - User guide, test suite and CI.
 
-[Unreleased]: https://github.com/drak42/stljoiner/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/drak42/stljoiner/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/drak42/stljoiner/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/drak42/stljoiner/releases/tag/v0.1.0
