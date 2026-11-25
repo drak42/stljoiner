@@ -1,6 +1,6 @@
 # stljoiner
 
-![stljoiner: STL code rain, a green-screen console joining three bracket pieces, and the pieces pulled apart with their cut faces lit](docs/images/banner.png)
+![stljoiner: STL code rain, a green-screen console joining three bracket pieces, and the pieces pulled apart with their cut faces lit](https://raw.githubusercontent.com/drak42/stljoiner/main/docs/images/banner.png)
 
 [![CI](https://github.com/drak42/stljoiner/actions/workflows/ci.yml/badge.svg)](https://github.com/drak42/stljoiner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/drak42/stljoiner/blob/main/LICENSE)
@@ -10,9 +10,9 @@ Put split 3D-print parts back together by matching the faces where they were cut
 
 Did you cut a model to fit your print bed, or download one that came in pieces? stljoiner finds the faces that mate, moves each piece into place, even if it's scattered and rotated, and merges everything.
 
-![The three scattered pieces spin and fly together onto their cut faces, then fuse into one solid](docs/images/how-it-works.gif)
+![The three scattered pieces spin and fly together onto their cut faces, then fuse into one solid](https://raw.githubusercontent.com/drak42/stljoiner/main/docs/images/how-it-works.gif)
 
-**New here? Start with the [user guide](docs/USER_GUIDE.md).**
+**New here? Start with the [user guide](https://github.com/drak42/stljoiner/blob/main/docs/USER_GUIDE.md).**
 
 ## Features
 
@@ -44,7 +44,7 @@ pipx install stljoiner
 stljoiner web          # then open http://127.0.0.1:4300
 ```
 
-![The web interface in its green-screen theme: face A is lit yellow on one piece, and its suggested mate on another piece is lit cyan with a 100% fit](docs/images/web-ui.png)
+![The web interface in its green-screen theme: face A is lit yellow on one piece, and its suggested mate on another piece is lit cyan with a 100% fit](https://raw.githubusercontent.com/drak42/stljoiner/main/docs/images/web-ui.png)
 
 1. Drop your parts in (STL, 3MF, OBJ, PLY, OFF or GLB). A 3MF or GLB holding several objects loads as several parts. Only **checked** parts can be picked, joined or exported.
 2. Click the cut face on one part (**A**, yellow). The best-fitting faces on the other parts light up cyan and are listed with their fit.
@@ -91,15 +91,15 @@ stljoiner a.stl b.stl --no-union -o placed.3mf         # placed, kept as separat
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md): a friendly walkthrough of the web interface and the command line.
-- [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
+- [User guide](https://github.com/drak42/stljoiner/blob/main/docs/USER_GUIDE.md): a friendly walkthrough of the web interface and the command line.
+- [Changelog](https://github.com/drak42/stljoiner/blob/main/CHANGELOG.md)
+- [Contributing](https://github.com/drak42/stljoiner/blob/main/CONTRIBUTING.md)
+- [Security](https://github.com/drak42/stljoiner/blob/main/SECURITY.md)
 
 ## Support
 
-stljoiner is free and open source. If it saves a print or two, you can [buy me a coffee](https://buymeacoffee.com/drak42) ☕. Bug reports, ideas and pull requests are just as welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+stljoiner is free and open source. If it saves a print or two, you can [buy me a coffee](https://buymeacoffee.com/drak42) ☕. Bug reports, ideas and pull requests are just as welcome: see [CONTRIBUTING.md](https://github.com/drak42/stljoiner/blob/main/CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 Christopher Eslick
+[MIT](https://github.com/drak42/stljoiner/blob/main/LICENSE) © 2026 Christopher Eslick
